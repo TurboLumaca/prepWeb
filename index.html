@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PrepWeb — Tecnologie Web, preparazione esame</title>
+<meta name="description" content="Piattaforma locale di preparazione all'esame di Tecnologie Web (UniBo Cesena): HTML, CSS, JavaScript e accessibilita WCAG 2.0 A.">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9881;</text></svg>">
+</head>
+<body>
+
+<a class="skip" href="#main">Salta al contenuto</a>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#/">
+      <span class="brand-mark" aria-hidden="true">TW</span>
+      <span class="brand-txt">PrepWeb<small>Tecnologie Web &middot; UniBo Cesena</small></span>
+    </a>
+
+    <div class="topbar-right">
+      <div class="hours" id="hoursBox" title="Monte ore di studio effettivo">
+        <span class="hours-val" id="hoursVal">0h 00m</span>
+        <span class="hours-tot">/ 6h</span>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="menuBtn" aria-expanded="false" aria-controls="mainnav">
+        <span aria-hidden="true">&#9776;</span><span class="sr-only">Apri il menu</span>
+      </button>
+    </div>
+  </div>
+
+  <nav id="mainnav" class="mainnav" aria-label="Navigazione principale">
+    <a href="#/" data-nav="/">Dashboard</a>
+    <a href="#/fase/1" data-nav="/fase/1">Fase 1 &middot; Conoscenza</a>
+    <a href="#/fase/2" data-nav="/fase/2">Fase 2 &middot; Ragionamento</a>
+    <a href="#/fase/3" data-nav="/fase/3">Fase 3 &middot; Produzione</a>
+    <a href="#/ripasso" data-nav="/ripasso">Ripasso mirato</a>
+    <a href="#/impostazioni" data-nav="/impostazioni">Impostazioni</a>
+  </nav>
+
+  <div class="phasebar" id="phasebar"></div>
+</header>
+
+<main id="main" class="wrap" tabindex="-1">
+  <noscript>
+    <div class="card cd-warn"><p>Questa piattaforma richiede JavaScript attivo.</p></div>
+  </noscript>
+  <div id="view" class="view"></div>
+</main>
+
+<footer class="foot">
+  <p>PrepWeb &mdash; tutto il contenuto è statico e locale. Nessuna connessione a Internet è necessaria.</p>
+</footer>
+
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+
+<script src="assets/js/util.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/highlight.js"></script>
+<script src="assets/js/editor.js"></script>
+<script src="assets/js/sandbox.js"></script>
+<script src="assets/js/grader.js"></script>
+
+<script src="assets/js/data/quiz.js"></script>
+<script src="assets/js/data/pairs.js"></script>
+<script src="assets/js/data/flash.js"></script>
+<script src="assets/js/data/fill.js"></script>
+<script src="assets/js/data/bugs.js"></script>
+<script src="assets/js/data/predict.js"></script>
+<script src="assets/js/data/debug.js"></script>
+<script src="assets/js/data/choice.js"></script>
+<script src="assets/js/data/plan.js"></script>
+<script src="assets/js/data/theory.js"></script>
+<script src="assets/js/data/micro.js"></script>
+<script src="assets/js/data/blocks.js"></script>
+<script src="assets/js/data/final.js"></script>
+
+<script src="assets/js/catalog.js"></script>
+<script src="assets/js/activities.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
