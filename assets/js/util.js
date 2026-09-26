@@ -103,7 +103,28 @@ PREP.data = PREP.data || {};
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  /* Marca temporale leggibile per i nomi dei file esportati: 2026-03-14-1805 */
+  function fmtFileStamp(d) {
+    d = d || new Date();
+    var p2 = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
+      + '-' + p2(d.getHours()) + p2(d.getMinutes());
+  }
+
+  /* "3 minuti fa", "2 ore fa", "5 giorni fa"... per l'ultimo salvataggio su file. */
+  function fmtAgo(ts) {
+    if (!ts) return 'mai';
+    var s2 = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (s2 < 60) return 'pochi istanti fa';
+    var m = Math.floor(s2 / 60);
+    if (m < 60) return m + (m === 1 ? ' minuto fa' : ' minuti fa');
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + (h === 1 ? ' ora fa' : ' ore fa');
+    var g = Math.floor(h / 24);
+    return g + (g === 1 ? ' giorno fa' : ' giorni fa');
+  }
+
   P.u = { el: el, esc: esc, rich: rich, clamp: clamp, fmtDur: fmtDur, fmtClock: fmtClock,
     norm: norm, tight: tight, fold: fold, shuffle: shuffle, seeded: seeded, letter: letter, say: say,
-    dedent: dedent, sleep: sleep };
+    dedent: dedent, sleep: sleep, fmtFileStamp: fmtFileStamp, fmtAgo: fmtAgo };
 })(window.PREP);

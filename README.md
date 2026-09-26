@@ -165,8 +165,8 @@ piattaforma.
 
 - **Persistenza.** Progressi, tempi, statistiche di errore e bozze di codice sono salvati in
   `localStorage`. Rientrando in un'attività si riparte dal primo esercizio non ancora risolto, e
-  la dashboard propone il punto di interruzione. Da *Impostazioni* si possono esportare e
-  reimportare i progressi come testo, per spostarli su un altro dispositivo.
+  la dashboard propone il punto di interruzione. `localStorage` è però legato al singolo browser
+  su quel dispositivo: non si sincronizza da solo fra telefono, iPad e computer.
 - **Tracciamento degli errori.** Ogni errore viene attribuito a un argomento (form, selettori,
   cascata, DOM, AJAX, accessibilità…). Il *Ripasso mirato* elenca gli esercizi sbagliati, dal più
   sbagliato al meno, filtrabili per linguaggio.
@@ -181,6 +181,29 @@ piattaforma.
   scheda. Il codice dello studente viene perciò strumentato con una guardia che interrompe
   l'esecuzione dopo 4 secondi con un messaggio esplicito. Se la strumentazione dovesse alterare
   la sintassi, si ripiega automaticamente sul sorgente originale.
+
+---
+
+## Portare i progressi da un dispositivo all'altro (telefono, iPad, computer)
+
+Nessun account, nessun server, nessun database online: i progressi si spostano come un file
+`.json` che rimane sempre sotto il tuo controllo.
+
+1. Su un dispositivo, apri *Impostazioni* → **Salva su file**. Viene scaricato
+   `prepweb-progressi-AAAA-MM-GG-hhmm.json` — su iPhone/iPad finisce nell'app File, di solito
+   nella cartella Download.
+2. Sposta quel file sull'altro dispositivo con qualunque mezzo tu preferisca: AirDrop, iCloud
+   Drive/Google Drive/Dropbox, Mail, Messaggi, un cavo. Sono tutti trasferimenti di file
+   ordinari: la piattaforma non partecipa e non serve alcuna connessione durante l'uso.
+3. Sull'altro dispositivo apri *Impostazioni* → **Carica da file** e scegli quel file.
+
+Il caricamento **unisce** i progressi, non li sovrascrive: per ogni esercizio vale il risultato
+migliore fra i due dispositivi (prima chi lo ha risolto, poi chi ci ha lavorato di più), i tempi
+di studio si prendono come massimo tra le due copie e gli argomenti da rivedere vengono
+ricalcolati dagli esercizi uniti. Puoi quindi lavorare un po' sul telefono e un po' sull'iPad,
+scambiarvi il file quante volte vuoi, senza mai perdere nulla su nessuno dei due lati.
+
+La dashboard mostra un promemoria quando ci sono parecchi esercizi non ancora salvati su file.
 
 ---
 

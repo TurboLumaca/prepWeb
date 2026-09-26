@@ -100,6 +100,7 @@
   ];
 
   var index = {};
+  var itemIndex = {};
   phases.forEach(function (ph) {
     ph.itemIds = [];
     ph.activities.forEach(function (a) {
@@ -107,11 +108,14 @@
       a.itemIds = a.items.map(function (i) { return i.id; });
       ph.itemIds = ph.itemIds.concat(a.itemIds);
       index[a.id] = a;
+      a.items.forEach(function (it) { itemIndex[it.id] = it; });
     });
   });
 
   function activity(id) { return index[id] || null; }
   function phase(n) { return phases[n - 1] || null; }
+  /* Il singolo esercizio a partire dal suo id (usato per il merge dei progressi). */
+  function item(id) { return itemIndex[id] || null; }
 
   /* Una fase è completata quando ogni suo esercizio è stato risolto almeno una volta. */
   function phaseDone(n) {
@@ -138,6 +142,6 @@
     return out.sort(function (x, y) { return y.rec.w - x.rec.w; });
   }
 
-  P.catalog = { phases: phases, activity: activity, phase: phase,
+  P.catalog = { phases: phases, activity: activity, phase: phase, item: item,
     phaseDone: phaseDone, phaseUnlocked: phaseUnlocked, weak: weak, index: index };
 })(window.PREP);

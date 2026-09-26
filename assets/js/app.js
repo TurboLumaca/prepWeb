@@ -85,6 +85,22 @@
       ]));
     }
 
+    /* promemoria di sincronizzazione: compare solo dopo un po' di lavoro non
+       ancora salvato su file, non a ogni singolo esercizio */
+    var chg = store.raw.changesSinceExport || 0;
+    var hoursSinceExport = (Date.now() - (store.raw.lastExportAt || 0)) / 3600000;
+    if (chg >= 10 || (chg > 0 && hoursSinceExport > 3)) {
+      var syncCard = el('div', { class: 'card cd-warn' });
+      syncCard.appendChild(el('p', { style: 'margin:0 0 .6rem',
+        text: chg + ' ' + (chg === 1 ? 'esercizio svolto' : 'esercizi svolti') + ' dall\'ultimo salvataggio su file'
+          + (store.raw.lastExportAt ? ' (' + u.fmtAgo(store.raw.lastExportAt) + ')' : '') + '. '
+          + 'Se vuoi portare i progressi su un altro dispositivo, salvali ora.' }));
+      var syncBtn = el('button', { class: 'btn', type: 'button', text: 'Salva su file' });
+      syncBtn.addEventListener('click', function () { downloadProgressFile(); viewHome(); });
+      syncCard.appendChild(syncBtn);
+      f.appendChild(syncCard);
+    }
+
     /* monte ore */
     var tot = store.raw.timeMs;
     var hours = el('div', { class: 'card' });
@@ -521,6 +537,49 @@
   }
 
   /* ======================= impostazioni ======================= */
+  /* ======================= sincronizzazione su file ======================= */
+  /* Nessun server: i progressi si portano da un dispositivo all'altro come un
+     file .json che lo studente stesso sposta con AirDrop, iCloud Drive, Mail
+     o un cavo. Il caricamento UNISCE (non sovrascrive): per ogni esercizio
+     vince il lato con più progresso, quindi si può salvare dal telefono,
+     caricare sull'iPad, continuare lì, e risalvare senza perdere nulla. */
+
+  function downloadProgressFile() {
+    var json = store.exportJson();
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: 'prepweb-progressi-' + u.fmtFileStamp() + '.json' });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    store.markExported();
+    paintHeader();
+  }
+
+  /* Apre il selettore di file del sistema e unisce il file scelto ai progressi
+     correnti. `onDone(report|null, error|null)` riceve l'esito. */
+  function pickAndMergeFile(onDone) {
+    var input = el('input', { type: 'file', accept: 'application/json,.json',
+      style: 'position:absolute;left:-9999px', 'aria-hidden': 'true' });
+    document.body.appendChild(input);
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.remove();
+      if (!file) { onDone(null, null); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var report = store.mergeJson(String(reader.result));
+          onDone(report, null);
+        } catch (e) { onDone(null, e); }
+      };
+      reader.onerror = function () { onDone(null, new Error('Impossibile leggere il file.')); };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
   function viewSettings() {
     var f = document.createDocumentFragment();
     f.appendChild(el('p', { class: 'small', html: '<a href="#/">Dashboard</a> / Impostazioni' }));
@@ -544,40 +603,59 @@
     c2.appendChild(el('p', { text: s.done + ' esercizi risolti su ' + s.total + ' · '
       + u.fmtDur(store.raw.timeMs) + ' di studio effettivo · ' + s.errors + ' errori registrati' }));
 
-    var exp = el('button', { class: 'btn btn-ghost', type: 'button', text: 'Esporta i progressi' });
-    exp.addEventListener('click', function () {
-      var ta = el('textarea', { class: 'ta', style: 'min-height:9rem;font-family:var(--mono);font-size:.8rem' });
-      ta.value = store.exportJson();
-      ta.readOnly = true;
-      c2.appendChild(el('p', { class: 'small', style: 'margin-top:.8rem',
-        text: 'Copia questo testo per conservare i progressi o spostarli su un altro dispositivo:' }));
-      c2.appendChild(ta);
-      ta.select();
-      exp.disabled = true;
-    });
-
-    var imp = el('button', { class: 'btn btn-ghost', type: 'button', text: 'Importa i progressi' });
-    imp.addEventListener('click', function () {
-      var ta = el('textarea', { class: 'ta', style: 'min-height:9rem;font-family:var(--mono);font-size:.8rem',
-        placeholder: 'Incolla qui il testo esportato...' });
-      var go = el('button', { class: 'btn', type: 'button', text: 'Conferma importazione' });
-      go.addEventListener('click', function () {
-        try { store.importJson(ta.value); location.hash = '#/'; location.reload(); }
-        catch (e) { alert('Testo non valido: ' + e.message); }
-      });
-      c2.appendChild(ta);
-      c2.appendChild(el('div', { class: 'btnrow' }, go));
-      imp.disabled = true;
-    });
-
     var wipe = el('button', { class: 'btn btn-danger', type: 'button', text: 'Azzera tutto' });
     wipe.addEventListener('click', function () {
       if (confirm('Azzerare progressi, tempi e bozze di codice? L\'operazione non è reversibile.')) {
         store.wipe(); location.hash = '#/'; location.reload();
       }
     });
-    c2.appendChild(el('div', { class: 'btnrow' }, [exp, imp, el('span', { class: 'spacer' }), wipe]));
+    c2.appendChild(el('div', { class: 'btnrow' }, [wipe]));
     f.appendChild(c2);
+
+    var c2b = el('div', { class: 'card' });
+    c2b.appendChild(el('h2', { class: 'mt0', style: 'font-size:1rem', text: 'Sincronizza fra dispositivi' }));
+    c2b.appendChild(el('p', { class: 'small',
+      text: 'Nessun account, nessun server: i progressi si portano da un dispositivo all\'altro come un file. '
+        + 'Salva il file dal telefono, spostalo sull\'iPad (AirDrop, iCloud Drive, Mail, cavo — quello che usi già), '
+        + 'poi caricalo qui: si unisce a cio\' che hai gia\' fatto su quel dispositivo, senza cancellare nulla.' }));
+
+    var syncStat = el('p', { class: 'small',
+      text: 'Ultimo salvataggio su file: ' + u.fmtAgo(store.raw.lastExportAt)
+        + (store.raw.changesSinceExport > 0
+          ? ' · ' + store.raw.changesSinceExport + ' modifiche non ancora salvate su file'
+          : ' · tutto salvato') });
+    c2b.appendChild(syncStat);
+
+    var save = el('button', { class: 'btn', type: 'button', text: 'Salva su file' });
+    var load = el('button', { class: 'btn btn-ghost', type: 'button', text: 'Carica da file' });
+    var syncMsg = el('div');
+    save.addEventListener('click', function () {
+      downloadProgressFile();
+      syncStat.textContent = 'Ultimo salvataggio su file: pochi istanti fa · tutto salvato';
+      syncMsg.textContent = '';
+      syncMsg.appendChild(el('p', { class: 'small mb0', style: 'color:var(--ok)',
+        text: 'File scaricato. Spostalo sull\'altro dispositivo e caricalo da lì con "Carica da file".' }));
+    });
+    load.addEventListener('click', function () {
+      load.disabled = true;
+      pickAndMergeFile(function (report, err) {
+        load.disabled = false;
+        syncMsg.textContent = '';
+        if (err) {
+          syncMsg.appendChild(el('p', { class: 'small mb0', style: 'color:var(--bad)',
+            text: 'Non e\' stato possibile importare il file: ' + err.message }));
+          return;
+        }
+        if (!report) return; // selezione annullata
+        syncMsg.appendChild(el('p', { class: 'small mb0', style: 'color:var(--ok)',
+          text: 'Uniti ' + report.totale + ' esercizi (' + report.aggiornati + ' aggiornati, '
+            + report.nuovi + ' nuovi da questo file). La pagina si ricarica...' }));
+        setTimeout(function () { location.hash = '#/'; location.reload(); }, 900);
+      });
+    });
+    c2b.appendChild(el('div', { class: 'btnrow' }, [save, load]));
+    c2b.appendChild(syncMsg);
+    f.appendChild(c2b);
 
     var c3 = el('div', { class: 'card' });
     c3.appendChild(el('h2', { class: 'mt0', style: 'font-size:1rem', text: 'Contenuti' }));

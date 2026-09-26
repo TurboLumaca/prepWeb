@@ -16,7 +16,9 @@
       last: null,       // {hash, label}
       drafts: {},       // id -> ultimo codice scritto dallo studente
       settings: { timer: false, phone: null },
-      startedAt: Date.now()
+      startedAt: Date.now(),
+      lastExportAt: 0,      // ultima volta che i progressi sono stati salvati su file
+      changesSinceExport: 0 // esercizi/bozze registrati dall'ultimo salvataggio su file
     };
   }
 
@@ -35,6 +37,8 @@
           mem.phaseTime = Object.assign({ 1: 0, 2: 0, 3: 0 }, d.phaseTime || {});
           mem.settings = Object.assign({ timer: false, phone: null }, d.settings || {});
           mem.drafts = d.drafts || {};
+          mem.lastExportAt = d.lastExportAt || 0;
+          mem.changesSinceExport = d.changesSinceExport || 0;
         }
       }
     } catch (e) { available = false; }
@@ -71,6 +75,7 @@
     if (ok) { r.s = 'done'; }
     else { r.w++; if (r.s !== 'done') r.s = 'wrong'; }
     mem.items[id] = r;
+    mem.changesSinceExport++;
 
     if (topic) {
       var t = mem.topics[topic] || { w: 0, n: 0 };
@@ -89,6 +94,7 @@
   function setDraft(id, txt) {
     if (txt === null || txt === undefined) delete mem.drafts[id];
     else mem.drafts[id] = String(txt);
+    mem.changesSinceExport++;
     save();
   }
 
@@ -177,11 +183,117 @@
   }
 
   function exportJson() { return JSON.stringify(mem, null, 2); }
+
+  /* Da chiamare subito dopo aver offerto il file in scaricamento: azzera il
+     contatore delle modifiche non salvate e registra il momento. */
+  function markExported() {
+    mem.lastExportAt = Date.now();
+    mem.changesSinceExport = 0;
+    saveNow();
+  }
+
+  /* Sostituzione integrale (usata solo per ripristinare un file esportato da
+     QUESTO stesso dispositivo, o quando lo studente sceglie esplicitamente
+     di sovrascrivere). Per portare i progressi da un dispositivo all'altro
+     si usa invece mergeJson, che non perde ciò che è gia' presente. */
   function importJson(txt) {
     var d = JSON.parse(txt);
     if (!d || d.v !== 1) throw new Error('Formato non riconosciuto');
     mem = Object.assign(blank(), d);
     saveNow();
+  }
+
+  /* Unisce un file esportato da un altro dispositivo con lo stato presente,
+     senza cancellare nulla. Per ogni esercizio vince il lato con il
+     progresso maggiore (prima "risolto", poi piu' tentativi, poi il piu'
+     recente); i tempi totali si prendono come massimo, cosi' importazioni
+     ripetute non li gonfiano; gli argomenti da rivedere vengono ricalcolati
+     dagli esercizi uniti, cosi' non si contano due volte gli stessi errori. */
+  function mergeJson(txt) {
+    var inc = JSON.parse(txt);
+    if (!inc || inc.v !== 1) throw new Error('Formato non riconosciuto: questo non e\' un file di progressi di PrepWeb.');
+
+    var incItems = inc.items || {}, incDrafts = inc.drafts || {};
+    var ids = {};
+    Object.keys(mem.items).forEach(function (id) { ids[id] = true; });
+    Object.keys(incItems).forEach(function (id) { ids[id] = true; });
+
+    var mergedItems = {}, incomingWins = {};
+    var aggiornati = 0, invariati = 0, nuovi = 0;
+
+    Object.keys(ids).forEach(function (id) {
+      var a = mem.items[id], b = incItems[id];
+      if (!a && !b) return;
+      if (!a) { mergedItems[id] = b; incomingWins[id] = true; nuovi++; return; }
+      if (!b) { mergedItems[id] = a; incomingWins[id] = false; invariati++; return; }
+
+      var aDone = a.s === 'done', bDone = b.s === 'done';
+      var bWins;
+      if (aDone !== bDone) bWins = bDone;
+      else if ((a.a || 0) !== (b.a || 0)) bWins = (b.a || 0) > (a.a || 0);
+      else bWins = (b.t || 0) > (a.t || 0);
+
+      var merged = {
+        s: (aDone || bDone) ? 'done' : (bWins ? b.s : a.s),
+        a: Math.max(a.a || 0, b.a || 0),
+        w: Math.max(a.w || 0, b.w || 0),
+        t: Math.max(a.t || 0, b.t || 0)
+      };
+      mergedItems[id] = merged;
+      incomingWins[id] = bWins;
+      if (merged.s !== a.s || merged.a !== a.a || merged.w !== a.w) aggiornati++;
+      else invariati++;
+    });
+
+    /* le bozze seguono lo stesso lato che ha "vinto" il merge dell'esercizio */
+    var mergedDrafts = {};
+    var draftIds = {};
+    Object.keys(mem.drafts).forEach(function (id) { draftIds[id] = true; });
+    Object.keys(incDrafts).forEach(function (id) { draftIds[id] = true; });
+    Object.keys(draftIds).forEach(function (id) {
+      var cur = mem.drafts[id], inn = incDrafts[id];
+      var pick;
+      if (Object.prototype.hasOwnProperty.call(incomingWins, id)) {
+        pick = incomingWins[id] ? (inn !== undefined ? inn : cur) : (cur !== undefined ? cur : inn);
+      } else {
+        pick = inn !== undefined ? inn : cur;
+      }
+      if (pick !== undefined) mergedDrafts[id] = pick;
+    });
+
+    /* argomenti da rivedere: ricalcolati dagli esercizi uniti (attempts/errori
+       per esercizio), non sommati dai due file, per evitare di contare due
+       volte lo stesso tentativo a ogni sincronizzazione successiva. */
+    var mergedTopics = {};
+    Object.keys(mergedItems).forEach(function (id) {
+      var it = P.catalog && P.catalog.item ? P.catalog.item(id) : null;
+      var topic = it && it.topic;
+      if (!topic) return;
+      var rec = mergedItems[id];
+      var t = mergedTopics[topic] || { w: 0, n: 0 };
+      t.n += rec.a || 0;
+      t.w += rec.w || 0;
+      mergedTopics[topic] = t;
+    });
+
+    mem.items = mergedItems;
+    mem.drafts = mergedDrafts;
+    mem.topics = mergedTopics;
+    mem.timeMs = Math.max(mem.timeMs || 0, inc.timeMs || 0);
+    mem.phaseTime = mem.phaseTime || { 1: 0, 2: 0, 3: 0 };
+    [1, 2, 3].forEach(function (n) {
+      mem.phaseTime[n] = Math.max(mem.phaseTime[n] || 0, (inc.phaseTime || {})[n] || 0);
+    });
+    mem.startedAt = Math.min(mem.startedAt || Date.now(), inc.startedAt || Date.now());
+    var incLast = inc.last, curLast = mem.last;
+    if (incLast && (!curLast || (incLast.t || 0) > (curLast.t || 0))) mem.last = incLast;
+
+    mem.changesSinceExport = 0;
+    mem.lastExportAt = Date.now();
+    saveNow();
+
+    return { aggiornati: aggiornati, invariati: invariati, nuovi: nuovi,
+      totale: Object.keys(mergedItems).length };
   }
 
   load();
@@ -192,7 +304,7 @@
     draft: draft, setDraft: setDraft,
     statsFor: statsFor, weakItems: weakItems, topicStats: topicStats,
     startClock: startClock, setPhase: setPhase, setLast: setLast,
-    wipe: wipe, exportJson: exportJson, importJson: importJson,
+    wipe: wipe, exportJson: exportJson, importJson: importJson, mergeJson: mergeJson, markExported: markExported,
     saveNow: saveNow,
     get available() { return available; },
     get raw() { return mem; },
